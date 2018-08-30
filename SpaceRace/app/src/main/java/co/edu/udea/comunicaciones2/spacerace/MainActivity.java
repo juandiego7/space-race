@@ -5,14 +5,11 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -65,7 +62,6 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -73,10 +69,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import Models.Meteorito;
 import Models.Shot;
 import Models.Spacecraft;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, SensorEventListener {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     /*
      * API INTEGRATION SECTION. This section contains the code that integrates
@@ -132,15 +129,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     MediaPlayer mp;
     MediaPlayer mpFondo;
     MediaPlayer mpChoque;
-    Drawable imgFacebook, imgNaveRival, imagenesNavesInv[], imagenesNaves[];
+    Drawable imgFacebook, imgNaveFriend, imagenesNavesInv[], imagenesNaves[];
     Drawable imgNave, imgMeteorito, imgMisil, imgFondo, imgFondo2, imgFondo3, imgGameOver, imgMisilRival;
     Drawable imgVida1, imgVida2, imgVida3, imPause, imPlay;
     PaperView papel;
     int naves[], meteoritos[], tamImgMet[][];
+    ArrayList<Meteorito> meteoritoArrayList;
+    int xCentroNave,yCentroNave, xCentroMet, yCentroMet, radioNave = 75, radioMet, tamSangreX3_X = 20, tamSangreX3_Y = 15;
     int x_nave, y_nave,x,y, tamNaveX = 100, tamNaveY = 150, x_bala, y_bala, tamBalaX = 40, tamBalaY = 60, tamNavePeqX=60, tamNavePeqY=110;
     int tamPantallaX,tamPantallaY;
     float x_sensor,y_sensor,z_sensor;
-    int tiempo, puntos, speed, vel, vidas, vidas_Rival, puntos_Extra, tiempo700=700, tiempo500=500, tiempo300=300, tiempo100=100;;
+    int tiempo, puntos, speed, vel, vidas, puntos_Extra, tiempo700=700, tiempo500=500, tiempo300=300, tiempo100=100;;
     int y_fondo,y_fondo2, y_inferior;
     boolean terminado, yaDiagonal, generaMeteoritos = false;
     long monedas;
@@ -189,6 +188,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //mpChoque = MediaPlayer.create(this,R.raw.explo1);
         //mpFondo.start();
 
+        meteoritoArrayList = new ArrayList<>();
         balas = new ArrayList<>();
         balas_Rival = new ArrayList<>();
         navesRival = new ArrayList<>();
@@ -205,7 +205,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //getWindowManager().getDefaultDisplay().getMetrics(metrics);
         //tamPantallaX = metrics.widthPixels; // ancho absoluto en pixels
         tamPantallaY = 0;// metrics.heightPixels; // alto absoluto en pixels
-
         x_nave = tamPantallaX/2;
         y_nave = tamPantallaY-tamNaveY;
 
@@ -220,12 +219,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         puntos_Extra = 0;
         vel=5;
         vidas = 3;
-        vidas_Rival = 3;
         y_fondo = 0;
         y_fondo2 = tamPantallaY;
-
-        sm = (SensorManager)getSystemService(SENSOR_SERVICE);
-        sensor = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        y_inferior = 0;
     }
 
     // Check the sample to ensure all placeholder ids are are updated with real-world values.
@@ -325,12 +321,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 ).addOnFailureListener(createFailureListener("There was a problem getting the inbox."));
                 break;
             case R.id.button_accept_popup_invitation:
+                switchToScreen(R.id.screen_wait);
                 // user wants to accept the invitation shown on the invitation popup
                 // (the one we got through the OnInvitationReceivedListener).
                 acceptInviteToRoom(mIncomingInvitationId);
                 mIncomingInvitationId = null;
                 break;
             case R.id.button_quick_game:
+                switchToScreen(R.id.screen_wait);
                 // user wants to play against a random opponent right now
                 startQuickGame();
                 break;
@@ -647,8 +645,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             switchToMainScreen();
         }
-        //finish();
-        sm.unregisterListener(this);
     }
 
     // Show the waiting room UI to track the progress of other players as they enter the
@@ -970,7 +966,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         terminado=false;
         papel.reiniciar();
         setContentView(papel);
-        sm.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     /*
@@ -1002,9 +997,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 case (byte) 'N':
                     x_nave_Rival = ((int) buf[1]) * 100 + ((int) buf[2]);
                     y_nave_Rival = ((int) buf[3]) * 100 + ((int) buf[4]);
-                    y_nave_Rival = tamPantallaY - y_nave_Rival - tamNaveY;
-                    imgNaveRival = imagenesNavesInv[(int) buf[5]];
-                    navesRival = new ArrayList<>();
+                    int tamAmigoY = ((int) buf[6]) * 100 + ((int) buf[7]);
+                    int tamAmigoX = ((int) buf[8]) * 100 + ((int) buf[9]);
+
+                    int porcentajeX = x_nave_Rival *  100 / tamAmigoX;
+                    int porcentajeY = y_nave_Rival *  100 / tamAmigoY;
+
+                    x_nave_Rival = tamPantallaX * porcentajeX / 100;
+                    y_nave_Rival = tamPantallaY * porcentajeY / 100;
+
+                    x_nave_Rival = x_nave_Rival > tamPantallaX - tamNaveX ? tamPantallaX - tamNaveX : x_nave_Rival;
+                    y_nave_Rival = y_nave_Rival > tamPantallaY - tamNaveY ? tamPantallaY - tamNaveY : y_nave_Rival;
+
+                    //y_nave_Rival = tamPantallaY - y_nave_Rival - tamNaveY;
+                    /*navesRival = new ArrayList<>();
                     int cantNaves = (int)(buf[10]), posX, posY, id;
                     Spacecraft n;// = new Spacecraft();
                     Log.d("Naves", "Hay: "+cantNaves);
@@ -1027,14 +1033,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         posY = tamPantallaY - posY - tamBalaY;
                         b = new Shot(posX, posY);
                         balas_Rival.add(b);
-                    }
+                    }*/
                     break;
                 case (byte) 'B':
-                    int xBal = ((int) buf[1]) * 100 + ((int) buf[2]);
-                    int yBal = ((int) buf[3]) * 100 + ((int) buf[4]);
-                    yBal = tamPantallaY - yBal - tamBalaY;
-                    Shot s = new Shot(xBal, yBal);
-                    balas_Rival.add(s);
+                    Shot shot = new Shot(x_nave_Rival+tamNaveX/2-tamBalaX/2, y_nave_Rival-tamBalaY);
+                    balas.add(shot);
                     break;
                 case (byte) 'M':
                     Log.d("M", "Imposible");
@@ -1060,9 +1063,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     //Toast.makeText(getApplicationContext(), "Pause", Toast.LENGTH_SHORT).show();
                     pauseActivado = true;
                     break;
+                case (byte) 'S':
+                    int time2  = ((int) buf[1]) * 100 + ((int) buf[2]);
+                    tiempo = time2 > tiempo ? time2 : tiempo;
+                    break;
                 case (byte) 'T':
-                    //Toast.makeText(getApplicationContext(), "Ganaste", Toast.LENGTH_SHORT).show();
-                    ganaste = true;
                     terminado = true;
                     papel.reiniciarListaMeteoritos();
                     //papel.reiniciar();
@@ -1079,8 +1084,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     papel.invalidate();
                     break;
                 case (byte) 'V':
-                    vidas_Rival = vidas_Rival - 1;
-                    Toast.makeText(getApplicationContext(), ""+vidas_Rival, Toast.LENGTH_SHORT).show();
+                    vidas = vidas - 1;
                     papel.reiniciarListaMeteoritos();
                     break;
                 case (byte) 'D':
@@ -1092,32 +1096,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     //meteoritoArrayList.remove(pos_met);
                     break;
             }
-
-            /*if (buf[0] == 'F' || buf[0] == 'U') {
-                // score update.
-                int existingScore = mParticipantScore.containsKey(sender) ?
-                        mParticipantScore.get(sender) : 0;
-                int thisScore = (int) buf[1];
-                if (thisScore > existingScore) {
-                    // this check is necessary because packets may arrive out of
-                    // order, so we
-                    // should only ever consider the highest score we received, as
-                    // we know in our
-                    // game there is no way to lose points. If there was a way to
-                    // lose points,
-                    // we'd have to add a "serial number" to the packet.
-                    mParticipantScore.put(sender, thisScore);
-                }
-
-                // update the scores on the screen
-                //updatePeerScoresDisplay();
-
-                // if it's a final score, mark this participant as having finished
-                // the game
-                if ((char) buf[0] == 'F') {
-                    mFinishedParticipants.add(realTimeMessage.getSenderParticipantId());
-                }
-            }*/
         }
     };
 
@@ -1145,13 +1123,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 mMsgBuf[8] = (byte) (tamPantallaX/100);
                 mMsgBuf[9] = (byte) (tamPantallaX%100);
                 //Enviar cada nave
-
-                break;
-            case (byte)'B':
-                mMsgBuf[1] = (byte) (x_bala/100);
-                mMsgBuf[2] = (byte) (x_bala%100);
-                mMsgBuf[3] = (byte) (y_bala/100);
-                mMsgBuf[4] = (byte) (y_bala%100);
                 break;
             case (byte)'M':
                 Log.d("M", "Imposible");
@@ -1171,6 +1142,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 //mMsgBuf[1] = (byte)(pos_met);
                 break;
             case (byte)'V':
+                break;
+            case (byte)'S':
+                mMsgBuf[1] = (byte) ((tiempo/60)/100);
+                mMsgBuf[2] = (byte) ((tiempo/60)%100);
                 break;
         }
 
@@ -1323,39 +1298,31 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    @Override
-    public void onSensorChanged(SensorEvent sensorEvent) {
-        x_sensor = sensorEvent.values[0];
-        y_sensor = sensorEvent.values[1];
-        z_sensor = sensorEvent.values[2];
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int i) {
-
-    }
-
     private class PaperView extends View {
         Paint paint;
-        int x, y, r, height = 0;
+        int height = 0, width = 0;
+        int x_move, y_move;
+        int maxX = 0;
+        int maxY = 0;
+        boolean yaNaveRival;
+        float distancia;
         public PaperView(Context context) {
             super(context);
             resetImgRefenrencias();
             reiniciar();
             paint = new Paint();
-            x = 0;
-            y = 0;
-            r = 0;
         }
 
         public void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             super.onMeasure(widthMeasureSpec,heightMeasureSpec);
-            int widthMode = MeasureSpec.getMode(widthMeasureSpec);
-            int widthSize = MeasureSpec.getSize(widthMeasureSpec);
-            int heightMode = MeasureSpec.getMode(heightMeasureSpec);
             int heightSize = MeasureSpec.getSize(heightMeasureSpec);
             height = heightSize > height ? heightSize : height;
             tamPantallaY = height;
+            y_fondo2 = y_fondo2 == 0 ? -tamPantallaY : y_fondo2;
+            y_nave = y_nave == -1? tamPantallaY-tamNaveY : y_nave;
+            y_nave_Rival = y_nave_Rival == -1? tamPantallaY-tamNaveY : y_nave_Rival;
+            maxY = tamPantallaY - tamNaveY;
+            Log.d("onMeasure", "tamPantallaY: "+tamPantallaY+"");
         }
 
         public void onDraw(Canvas canvas){
@@ -1365,105 +1332,196 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             paint.setTextSize(50);
             paint.setAntiAlias(true);
 
+
             //Fondo
             setFondo(c);
 
-            //Vidas
-            imagenVidas(vidas, 10, tamPantallaY-50).draw(canvas);
+            if(!terminado){
+                //Vidas
+                imagenVidas(vidas, 10, tamPantallaY-60).draw(canvas);
 
-            //Tiempo
-            canvas.drawText (""+(tiempo/60),0,150,paint);
-            tiempo++;
+                //Tiempo
+                canvas.drawText (""+(tiempo/60),8,150, paint);
+                tiempo++;
+                broadcastScore(false, (byte)'S');
 
-            //dibujeTodo(canvas);
-            invalidate();
+                //Ubicar mi nave
+                locateMySpacecraft(c);
 
-//            canvas.drawPaint(paint);
+                //Ubicar la nave de mi compañero
+                locateFriendSpacecraft(c);
 
+                //Agregar meteorito
+                nuevoMeteorito();
 
-//            puntos = tiempo/60;
-//            monedas = puntos/10 + puntos_Extra/10;
-//            int xBal, yBal;
-//            int cantNaves = misNaves.size()*5;
-//            mMsgBuf[11+cantNaves] = (byte) balas.size();
-//            for (int i=0; i<balas.size(); i++){
-//                xBal=balas.get(i).getPosX(); yBal = balas.get(i).getPosY();
-//
-//                b = new Rect(xBal, yBal, xBal+tamBalaX, yBal+tamBalaY);
-//                n = new Rect(x_nave_Rival, y_nave_Rival, x_nave_Rival+tamNaveX, y_nave_Rival+tamNaveY);
-//
-//                if(Rect.intersects(b,n)){ //colision bala-naveRival
-//
-//                    mpChoque.seekTo(1000);
-//                    mpChoque.start();
-//
-//                    balas.get(i).setPosY(-tamPantallaY);
-//                    //gam over
-//                    x_nave_Rival=tamPantallaX/2-tamNaveX/2;
-//                    y_nave_Rival=0;
-//                    break;
-//                }else if(colisionMisBalasNaves()){
-//                    balas.remove(i);
-//                    //pauseActivado = true;
-//                    xBal = -tamPantallaX;
-//                    yBal = -tamPantallaY;
-//                }else if (balas.get(i).getPosY()<0){
-//                    balas.remove(i);
-//                    xBal = -tamPantallaX;
-//                    yBal = -tamPantallaY;
-//                }else {
-//                    yBal-=8;
-//                    balas.get(i).setPosY(yBal);
-//                    imgMisil.setBounds(xBal,yBal,xBal+tamBalaX,yBal+tamBalaY);
-//                    imgMisil.draw(canvas);
-//                }
-//                mMsgBuf[12+cantNaves+4*i] = (byte) (xBal/100);
-//                mMsgBuf[13+cantNaves+4*i] = (byte) (xBal%100);
-//                mMsgBuf[14+cantNaves+4*i] = (byte) (yBal/100);
-//                mMsgBuf[15+cantNaves+4*i] = (byte) (yBal%100);
-//
-//
-//            }
-//            broadcastScore(false, (byte) 'N');
-//            for (int j=0; j<balas_Rival.size(); j++){
-//                yBal = balas_Rival.get(j).getPosY();
-//                xBal = balas_Rival.get(j).getPosX();
-//                imgMisilRival.setBounds(xBal,yBal,xBal+tamBalaX,yBal+tamBalaY);
-//                imgMisilRival.draw(canvas);
-//
-//                b = new Rect(xBal, yBal, xBal+tamBalaX, yBal+tamBalaY);
-//                Log.d("Misil", xBal+" ---"+b.left+ "  +++  "+yBal+" /// " + b.top);
-//                n = new Rect(x_nave, y_nave, x_nave+tamNaveX, y_nave+tamNaveY);
-//                if(Rect.intersects(b,n)){ //colision bala-meteorito
-//
-//                    mpChoque.seekTo(1000);
-//                    mpChoque.start();
-//
-//                    balas_Rival.remove(j);
-//                    vidaPerdida(canvas);
-//                    x_nave=tamPantallaX/2-tamNaveX/2;
-//                    y_nave=tamPantallaY-tamNaveY/2;
-//                    continue;
-//                }
-//                if(!colisionBalaconBala(canvas))
-//                    colisionBalasNaves();
-//            }
-//
-//            if(tiempo%1000 == 0){
-//                vel = vel + 1;
-//                if (tiempo100 > 20){
-//                    tiempo700 = tiempo700 - 20;
-//                    tiempo500 = tiempo500 - 20;
-//                    tiempo300 = tiempo300 - 20;
-//                    tiempo100 = tiempo100 - 20;
-//                }
-//
-//            }
-//            nuevaNave();
-//
-            /*if( vidas > 0){
+                //Dibujar meteoritos
+                dibujarMeteoritos(c);
+
+                //Dibujar misiles
+                dibujarMisil(c);
+
+                //Aumentar velocidad
+                if(tiempo%1000 == 0){
+                    vel = vel + 1;
+                }
+
+                //Repetir ciclo
                 invalidate();
-            }*/
+            }else {
+                dibujeFinJuego(c);
+            }
+        }
+
+        public void nuevoMeteorito(){
+            int tam, mX, mY, finX, finY;
+            float pen, intercep;
+            if (!yaDiagonal && tiempo > 10){
+                yaDiagonal = true;
+            }
+            if (!yaNaveRival && tiempo > 5){
+                yaNaveRival = true;
+            }
+            /*if(tiempo%tiempo700 == 0 && yaNaveRival){
+                int pos = (int)(Math.random()*(naves.length));
+                Boolean b = new Random().nextBoolean();
+                Spacecraft n = new Spacecraft(tamNaveX/2,-tamNaveY,pos,pos,b,true, 5);
+                Log.d("nave", "otra añadida " + pos);
+                pos = (int)(Math.random()*(100) + 30);
+                n.setIntervaloTiempo(pos);
+                naveRival.add(n);
+            }else*/ if (tiempo%tiempo500 == 0 && yaDiagonal){
+                tam = (int)(Math.random()*50 + 80);
+                mX = (int)(Math.random()*(tamPantallaX-tam));
+                mY = -tam;
+                finX =  (int)(Math.random()*tamPantallaX) - tam;
+                if (mX == finX){
+                    mX++;
+                }
+                finY = tamPantallaY;
+                pen = ((mY - finY)/(float)(mX - finX));
+                intercep = mY - pen*mX;
+                agregarMeteorito(mX, mY, tam, pen, intercep);
+            }else if(tiempo%tiempo300 == 0){
+                tam = (int)(Math.random()*200 + 150);
+                mX = (int)(Math.random()*(tamPantallaX-tam));
+                mY = -tam;
+                finX =  mX + 1;
+                finY = tamPantallaY;
+                pen = ((mY - finY)/(float)(mX - finX));
+                intercep = mY - pen*mX;
+                agregarMeteorito(mX, mY, tam, pen, intercep);
+            }else if(tiempo%tiempo100 == 0){
+                tam = (int)(Math.random()*50 + 70);
+                mX = (int)(Math.random()*(tamPantallaX-tam));
+                mY = -tam;
+                finX =  mX + 1;
+                finY = tamPantallaY;
+                pen = ((mY - finY)/(float)(mX - finX));
+                intercep = mY - pen*mX;
+                agregarMeteorito(mX, mY, tam, pen, intercep);
+            }
+        }
+
+        public void agregarMeteorito(int x, int y, int tam, float p, float b){
+            int pos = (int)(Math.random()*(meteoritos.length));
+            Log.d("met",pos+"");
+            Meteorito m = new Meteorito(x,y,b,p,tam,pos);
+            meteoritoArrayList.add(m);
+        }
+
+        public void dibujarMeteoritos(Canvas canvas){
+            int yMetDiagonal, xMetDiagonal;
+            for(int i = 0; i < meteoritoArrayList.size(); i++) {
+                colisionBalasDiagonal(i);
+                if(colisionNaveMeteoritos(i)){
+                    y_nave = tamPantallaY - tamNaveY;
+                    x_nave = tamPantallaX / 2;
+                    meteoritoArrayList.get(i).setPosY(tamPantallaY*2);
+                    vidaPerdida(canvas);
+                    break;
+                }
+                yMetDiagonal = meteoritoArrayList.get(i).getPosY();
+                if (yMetDiagonal > tamPantallaY){
+                    elimineMeteorito(i);
+                }else{
+                    yMetDiagonal = yMetDiagonal + vel;
+                    //y_meteoritosDiagonal.set(i, yMetDiagonal);
+                    meteoritoArrayList.get(i).setPosY(yMetDiagonal);
+                    //xMetDiagonal = (int) ((yMetDiagonal - interceptos.get(i))/pendientes.get(i));
+                    xMetDiagonal = (int) ((yMetDiagonal - meteoritoArrayList.get(i).getIntercepto())/meteoritoArrayList.get(i).getPendiente());
+                    //x_meteoritosDiagonal.set(i, xMetDiagonal);
+                    int tam = meteoritoArrayList.get(i).getTamaño();
+                    meteoritoArrayList.get(i).setPosX(xMetDiagonal);
+                    imgMeteorito = getApplicationContext().getResources().getDrawable(meteoritos[meteoritoArrayList.get(i).getImagen()]);
+                    imgMeteorito.setBounds(xMetDiagonal, yMetDiagonal, xMetDiagonal+tam, yMetDiagonal+tam);
+                    imgMeteorito.draw(canvas);
+                    //canvas.drawCircle(xMetDiagonal+tam/2, yMetDiagonal+tam/2, 5, paint);
+
+
+                }
+            }
+        }
+
+        public boolean colisionNaveMeteoritos(int posMet){
+            int yMet = meteoritoArrayList.get(posMet).getPosY(),
+                    xMet = meteoritoArrayList.get(posMet).getPosX(),
+                    tam = meteoritoArrayList.get(posMet).getTamaño();
+
+            b = new Rect(xMet, yMet, xMet+tam, yMet+tam);
+            n = new Rect(x_nave, y_nave, x_nave+tamNaveX, y_nave+tamNaveY);
+
+            if (Rect.intersects(b,n)){
+                //pauseActivado = true;
+                xCentroNave = x_nave + tamNaveX/2;
+                yCentroNave = y_nave + tamNaveY/2;
+                radioMet = tam / 2;
+                //canvas.drawCircle(xCentroNave, yCentroNave, 5, paint);
+                xCentroMet = xMet + radioMet;
+                yCentroMet = yMet + radioMet;
+
+                distancia = (float) Math.hypot(y_nave-yCentroMet, xCentroNave-xCentroMet);
+                if (distancia < radioMet)
+                    return true;
+                distancia = (float) Math.hypot(yCentroNave-yCentroMet, xCentroNave-xCentroMet);
+                if (distancia < radioMet)
+                    return true;
+                distancia = (float) Math.hypot(y_nave+tamNaveY*0.8-yCentroMet, x_nave-xCentroMet);
+                if (distancia < radioMet)
+                    return true;
+                distancia = (float) Math.hypot(y_nave+tamNaveY-yCentroMet, xCentroNave-xCentroMet);
+                if (distancia < radioMet)
+                    return true;
+                distancia = (float) Math.hypot(y_nave+tamNaveY*0.8-yCentroMet, x_nave+tamNaveX-xCentroMet);
+                if (distancia < radioMet)
+                    return true;
+
+            }
+            return false;
+        }
+
+        public void colisionBalasDiagonal(int pos){
+            int tama=meteoritoArrayList.get(pos).getTamaño(), xMet=meteoritoArrayList.get(pos).getPosX(), yMet=meteoritoArrayList.get(pos).getPosY(), xBal, yBal;
+            for (int j=0; j<balas.size(); j++){
+                xBal = balas.get(j).getPosX();
+                yBal = balas.get(j).getPosY();
+                b = new Rect(xBal, yBal, xBal+tamBalaX, yBal+tamBalaY);
+                n = new Rect(xMet, yMet, xMet+tama, yMet+tama);
+                //if(xBal >= xMet && xBal <= xMet+tama && yBal >= yMet && yBal <= yMet + tama){ //colision bala-meteorito
+                if (Rect.intersects(b,n)){
+                    if(tama>=100){
+                        tama = tama-20;
+                        meteoritoArrayList.get(pos).setTamaño(tama);
+                    }else{
+                        meteoritoArrayList.get(pos).setPosY(tamPantallaY + 5);
+                    }
+                    balas.get(j).setPosY(-5);
+                    puntos_Extra+=2;
+                }
+            }
+        }
+
+        public void elimineMeteorito(int posicion){
+            meteoritoArrayList.remove(posicion);
         }
 
         private boolean colisionMisBalasNaves() {
@@ -1502,6 +1560,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
             return false;
         }
+
         public void vidaPerdida(Canvas canvas){
             vidas = vidas - 1;
             broadcastScore(false, (byte) 'V');
@@ -1512,15 +1571,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             if (vidas == 0) {
                 terminado = true;
                 broadcastScore(false, (byte) 'T');
-                dibujeTodo(canvas);
+//                dibujeTodo(canvas);
                 vel = 5;
             }
         }
 
         public void configureNaves(Canvas canvas){
-            imgNaveRival.setBounds(x_nave_Rival, y_nave_Rival, x_nave_Rival+tamNaveX, y_nave_Rival+tamNaveY);
-            imgNaveRival.draw(canvas);
-            imagenVidas(vidas_Rival, 10, 10).draw(canvas);
+            imgNaveFriend.setBounds(x_nave_Rival, y_nave_Rival, x_nave_Rival+tamNaveX, y_nave_Rival+tamNaveY);
+            imgNaveFriend.draw(canvas);
             Drawable imgNaveR;
             for(int i=0; i < navesRival.size(); i++) {
                 imgNaveR = imagenesNavesInv[navesRival.get(i).getImagen()];//getApplicationContext().getResources().getDrawable(naves[img_NaveRival.get(i)]);
@@ -1592,6 +1650,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public void resetImgRefenrencias(){
             Context context = getApplicationContext();
             imgNave = getNave(context);
+            imgNaveFriend = context.getResources().getDrawable(R.drawable.nave10);
             imgMeteorito = context.getResources().getDrawable(R.drawable.m);
             imgFondo = context.getResources().getDrawable(R.drawable.stars);
             imgFondo2 = context.getResources().getDrawable(R.drawable.stars);
@@ -1615,11 +1674,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             imagenesNaves = new Drawable[naves.length];
             imagenesNavesInv = new Drawable[naves.length];
+            meteoritos = new int[]{R.drawable.m, R.drawable.m2, R.drawable.m3};
 //            Matrix matrix = new Matrix();
 //            Bitmap bm;// = BitmapFactory.decodeResource(getResources(), config.getIdNave());
 //            matrix.postRotate(180.0f);
             //Girando las naves rivales
-//            imgNaveRival = imgNave;
+//            imgNaveFriend = imgNave;
 //            for (int j =0; j<naves.length; j++){
 //                bm = BitmapFactory.decodeResource(getResources(), naves[j]);
 //                bm = Bitmap.createBitmap(bm, 0, 0, bm.getWidth(), bm.getHeight(), matrix, true);
@@ -1628,7 +1688,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 //
 //                if (R.drawable.nave24 == naves[j]){
 //                    posIDNaveRival = j;
-//                    imgNaveRival = imagenesNavesInv[j];
+//                    imgNaveFriend = imagenesNavesInv[j];
 //                }
 //
 //            }
@@ -1663,77 +1723,76 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         public void setFondo(Canvas canvas){
-            /*imgFondo3.setBounds(0,0, tamPantallaX, height);
-            imgFondo3.draw(canvas);*/
-            imgFondo.setBounds(0,y_fondo,tamPantallaX,tamPantallaY+y_fondo);
+            imgFondo3.setBounds(0,0,tamPantallaX, tamPantallaY);
+            imgFondo3.draw(canvas);
+            /*imgFondo.setBounds(0,y_fondo,tamPantallaX,tamPantallaY+y_fondo);
             imgFondo2.setBounds(0,y_fondo2,tamPantallaX, y_inferior);
             imgFondo.draw(canvas);
             imgFondo2.draw(canvas);
             y_fondo+=2;
             y_fondo2+=2;
             y_inferior+=2;
-            if(y_fondo>tamPantallaY){
+            if(y_fondo == tamPantallaY){
                 y_fondo = -tamPantallaY;
             }
-            if(y_fondo2>tamPantallaY){
+            if(y_fondo2 == tamPantallaY){
                 y_fondo2 = -tamPantallaY;
                 y_inferior = 0;
-            }
+            }*/
         }
 
-        public void configurarPosNave_yFondo(){
-//            if (z_sensor<4){
-//                speed = 8;
-//            }else if (z_sensor<6){
-//                speed = 7;
-//            }else if (z_sensor<8){
-//                speed = 6;
-//            }else{
-//                speed = 4;
-//            }
-//            speed = (int) (Math.abs(x_sensor)*3);
-//            if (x_sensor>0&&y_sensor<0){//izquierda-arriba
-//                x = -1* speed;
-//                y = -1* speed;
-//            }else if (x_sensor<0&&y_sensor<0){//derecha-arriba
-//                x = 1* speed;
-//                y = -1* speed;
-//            }else if (x_sensor>0&&y_sensor>0){//izquierda-abajo
-//                x = -1* speed;
-//                y = 1* speed;
-//            }else if (x_sensor<0&&y_sensor>0){//derecha-abajo
-//                x = 1* speed;
-//                y = 1* speed;
-//            }
-//            x_nave = x_nave + x;
-//            y_nave = y_nave + y;
-//
-//            if (x_nave <= 0){
-//                x_nave =+speed;
-//                x_nave = 0;
-//            }
-//            if (x_nave +  tamNaveX >= tamPantallaX){
-//                x_nave -= speed;
-//                x_nave = tamPantallaX-tamNaveX;
-//            }
-//            if (y_nave <= tamPantallaY/2){
-//                y_nave += speed;
-//                y_nave = tamPantallaY/2;
-//            }
-//            if (y_nave + tamNaveY >= tamPantallaY){
-//                y_nave -= speed;
-//                y_nave = tamPantallaY -tamNaveY;
-//            }
+        public void locateMySpacecraft(Canvas canvas){
+            imgNave.setBounds(x_nave, y_nave, x_nave + tamNaveX, y_nave + tamNaveY);
+            imgNave.draw(canvas);
+        }
 
-            y_fondo+=2;
-            y_fondo2+=2;
-            y_inferior+=2;
-            if(y_fondo>tamPantallaY){
-                y_fondo = -tamPantallaY;
+        public void locateFriendSpacecraft(Canvas canvas){
+            imgNaveFriend.setBounds(x_nave_Rival, y_nave_Rival, x_nave_Rival+tamNaveX, y_nave_Rival+tamNaveY);
+            imgNaveFriend.draw(canvas);
+        }
+
+        public void setMySpacecraft(){
+            if (z_sensor<4){
+                speed = 8;
+            }else if (z_sensor<6){
+                speed = 7;
+            }else if (z_sensor<8){
+                speed = 6;
+            }else{
+                speed = 4;
             }
-            if(y_fondo2>tamPantallaY){
-                y_fondo2 = -tamPantallaY;
-                y_inferior = 0;
+            speed = (int) (Math.abs(x_sensor)*3);
+            if (x_sensor>0&&y_sensor<0){//izquierda-arriba
+                x = -1* speed;
+                y = -1* speed;
+            }else if (x_sensor<0&&y_sensor<0){//derecha-arriba
+                x = 1* speed;
+                y = -1* speed;
+            }else if (x_sensor>0&&y_sensor>0){//izquierda-abajo
+                x = -1* speed;
+                y = 1* speed;
+            }else if (x_sensor<0&&y_sensor>0){//derecha-abajo
+                x = 1* speed;
+                y = 1* speed;
+            }
+            x_nave = x_nave + x;
+            y_nave = y_nave + y;
+
+            if (x_nave <= 0){
+                x_nave =+speed;
+                x_nave = 0;
+            }
+            if (x_nave +  tamNaveX >= tamPantallaX){
+                x_nave -= speed;
+                x_nave = tamPantallaX-tamNaveX;
+            }
+            if (y_nave <= tamPantallaY/2){
+                y_nave += speed;
+                y_nave = tamPantallaY/2;
+            }
+            if (y_nave + tamNaveY >= tamPantallaY){
+                y_nave -= speed;
+                y_nave = tamPantallaY -tamNaveY;
             }
         }
 
@@ -1751,27 +1810,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         public void dibujeFinJuego(Canvas canvas){
             paint.setTextSize(50);
-            String add[] = {getString(R.string.win), getString(R.string.lose)};
-            int a=1;
-            if(ganaste){
-                a=0;
-            }
-            canvas.drawText(getString(R.string.versus),tamPantallaX/2-120, tamPantallaY/2-200, paint);
-            for (Participant p : mParticipants) {
-                if (p.getParticipantId().equals(mMyId)){
-                    canvas.drawText(p.getDisplayName()+" - "+add[a],tamPantallaX/2-200, tamPantallaY/2-350, paint);
-                }else{
-                    canvas.drawText(p.getDisplayName()+" - "+add[1-a], tamPantallaX/2-200, tamPantallaY/2-100, paint);
-                }
-            }
-
-            img = papel.getDrawingCache();
-
-            imPlay.setBounds(tamPantallaX/2-225, tamPantallaY/2+30, tamPantallaX/2+225, tamPantallaY/2+230);
-            imPlay.draw(canvas);
-
-            imgFacebook.setBounds(tamPantallaX/2-50,tamPantallaY/2+300, tamPantallaX/2+50, tamPantallaY/2+400);
-            imgFacebook.draw(canvas);
+            canvas.drawText ("Fin del juego",tamPantallaX/3,tamPantallaY/2- 100, paint);
+            canvas.drawText ("Puntos: "+(tiempo/60),tamPantallaX/3 + 10,tamPantallaY/2, paint);
         }
 
         public void reiniciarListaMeteoritos(){
@@ -1779,37 +1819,132 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             balas_Rival = new ArrayList<>();
         }
 
-        public boolean onTouchEvent(MotionEvent event){
-            if (event.getAction()==MotionEvent.ACTION_DOWN){
-                //Log.d("coor", "X: " + event.getX()+ " Y: " + event.getY() + " pX: "+tamPantallaX +  " py: " + tamPantallaY);
-                if (pauseActivado && event.getX() >= tamPantallaX/2 -225 && event.getX() <= tamPantallaX/2 + 225 && event.getY() >= tamPantallaY/2 - 100 && event.getY() <= tamPantallaY/2 + 100){
-                    pauseActivado = false;
-                    broadcastScore(false, (byte)'R');
-                    invalidate();
-                }else if (!terminado  && !pauseActivado && event.getX() > tamPantallaX -70 && event.getY() < 70){
-                    pauseActivado = true;
-                    broadcastScore(false, (byte)'P');
-                    invalidate();
-                }else if (terminado && event.getX() >= tamPantallaX/2-150 && event.getX() <= tamPantallaX/2+150 && event.getY() >= tamPantallaY/2+30 && event.getY() <= tamPantallaY/2+230){
-                    reiniciar();
-                    broadcastScore(false, (byte)'O');
-                    invalidate();
-                }else if(!pauseActivado && !terminado){
-                    //mp.seekTo(200);
-                    //mp.start();
-                    x_bala = x_nave+tamNaveX/2-tamBalaX/2;
-                    y_bala = y_nave-tamBalaY;
-                    Shot shot = new Shot(x_bala, y_bala);
-                    balas.add(shot);
+        public void dibujarMisil(Canvas canvas){
+            int xBal, yBal;
+            for (int i=0; i<balas.size(); i++){
+                xBal=balas.get(i).getPosX(); yBal = balas.get(i).getPosY();
+                if (yBal<0){
+                    balas.remove(i);
+                    continue;
+                }else{
+                    imgMisil.setBounds(xBal,yBal,xBal+tamBalaX,yBal+tamBalaY);
+                    imgMisil.draw(canvas);
+                    yBal-=10;
+                    balas.get(i).setPosY(yBal);
                 }
+                b.set(xBal, yBal, xBal+tamBalaX, yBal+tamBalaY);
+                /*for (int p = 0; p < naveRival.size(); p++){
+                    xBal = naveRival.get(p).getPosX(); yBal = naveRival.get(p).getPosY();
+                    n.set(xBal, yBal, xBal+tamNaveX,yBal+tamNaveY);
+                    //if(xBal >= naveRival.get(p).getPosX() && xBal <= naveRival.get(p).getPosX()+tamNaveX && yBal >= naveRival.get(p).getPosY() && yBal <= naveRival.get(p).getPosY()+tamNaveY){ //colision bala-naveRival
+                    if (Rect.intersects(b,n) && yBal >= -tamNaveY/5){
+                        if (config.getSonido()){
+                            mpChoque.seekTo(1000);
+                            mpChoque.start();
+                        }
+                        balas.get(i).setPosY(-2*tamBalY);
+                        int vidasRival = naveRival.get(p).getVidas();
+                        if (vidasRival == 1){
+                            naveRival.remove(p);
+                            continue;
+                        }else{
+                            vidasRival--;
+                            naveRival.get(p).setVidas(vidasRival);
+                        }
 
+                    }
+                }*/
+
+
+            }
+            /*for (int j=0; j<balas_Rival.size(); j++){
+                yBal = balas_Rival.get(j).getPosY(); xBal = balas_Rival.get(j).getPosX();
+                if (yBal>tamPantallaY){
+                    balas_Rival.remove(j);
+                    continue;
+                }else{
+                    yBal+=10;
+                    balas_Rival.get(j).setPosY(yBal);
+                    imgMisilRival.setBounds(xBal,yBal,xBal+tamBalX,yBal+tamBalY);
+                    imgMisilRival.draw(canvas);
+                }
+                b.set(xBal, yBal, xBal+tamBalX, yBal+tamBalY);
+                n.set(x_nave, y_nave, x_nave+tamNaveX, y_nave+tamNaveY);
+                if(Rect.intersects(b,n)){ //colision bala-meteorito
+                    if (config.getSonido()){
+                        mpChoque.seekTo(1000);
+                        mpChoque.start();
+                    }
+                    balas_Rival.remove(j);
+                    vidaPerdida(canvas);
+                    continue;
+                }
+                b.set(xBal, yBal, xBal+tamBalX, yBal+tamBalY);
+                colisionBalaconBala(j);
+            }*/
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event){
+            switch (event.getAction()){
+                case MotionEvent.ACTION_MOVE:
+                    int escala_x = 7;
+                    int escala_y = 7;
+                    x_move = (int)event.getX();
+                    y_move = (int)event.getY();
+                    if(x_move > x  && y_move < y){//arriba-derecha
+                        escala_y*=-1;
+                    }else if(x_move < x  && y_move < y){//arriba-izquierda
+                        escala_x*=-1;
+                        escala_y*=-1;
+                    }else if(x_move < x  && y_move > y){//abajo-derecha
+                        escala_x*=-1;
+                    }
+                    if( x_move - x != 0){
+                        int m = Math.abs((y_move - y ) / ( x_move - x));
+                        if(m < 2){
+                            escala_y = 0;
+                        }
+                        if(m > 5){
+                            escala_x = 0;
+                        }
+                    }
+                    int new_x = x_nave + escala_x;
+                    int new_y = y_nave + escala_y;
+                    x_nave = new_x < 0 || new_x > maxX ? x_nave : new_x;
+                    y_nave = new_y < 0 || new_y > maxY ? y_nave : new_y;
+                    broadcastScore(false, (byte) 'N');
+                    break;
+                case MotionEvent.ACTION_DOWN:
+                    x = (int)event.getX();
+                    y = (int)event.getY();
+                    Shot shot = new Shot(x_nave+tamNaveX/2-tamBalaX/2, y_nave-tamBalaY);
+                    balas.add(shot);
+                    broadcastScore(false, (byte) 'B');
+                    break;
+                case MotionEvent.ACTION_UP:
+                    break;
+            }
+            if(!terminado){
+                invalidate();
             }
             return true;
         }
 
         private void reiniciar() {
+            yaNaveRival = false;
+            meteoritoArrayList = new ArrayList<>();
+            maxX = tamPantallaX - tamNaveX;
+            x_move = 0;
+            y_move = 0;
+            x_nave = tamPantallaX/3 - tamNaveX/2;
+            x_nave_Rival = (tamPantallaX/3)*2 - tamNaveX/2;
+            y_nave = -1;
+            y_nave_Rival = -1;
+            y_fondo = 0;
+            y_fondo2 = tamPantallaY;
+            y_inferior = 0;
             vel = 5;
-            vidas_Rival = 3;
             vidas = 3;
             tiempo = 0;
             tiempo100 = 100;
@@ -1824,7 +1959,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         public Drawable getNave(Context ctx){
-            return ctx.getResources().getDrawable(R.drawable.nave24);
+            return ctx.getResources().getDrawable(R.drawable.nave4);
         }
 
         public void colisionBalasNaves(){
