@@ -26,7 +26,6 @@
         <TextView style="@style/GameTitle" />
         <TextView style="@style/GameBlurb" />
         <com.google.android.gms.common.SignInButton android:id="@+id/button_sign_in"
-            android:onClick="onClick"
             style="@style/SignInButton" />
     </LinearLayout>
 
@@ -34,25 +33,21 @@
     <LinearLayout android:id="@+id/screen_main" style="@style/LLScreen">
         <TextView style="@style/GameTitle" />
         <Button android:id="@+id/button_quick_game"
-            android:onClick="onClick"
             style="@style/MainScreenButton"
             android:text="@string/quick_game" />
         <TextView style="@style/MainScreenButtonBlurb"
             android:text="@string/quick_game_explanation" />
         <Button android:id="@+id/button_invite_players"
-            android:onClick="onClick"
             style="@style/MainScreenButton"
             android:text="@string/invite_players" />
         <TextView style="@style/MainScreenButtonBlurb"
             android:text="@string/invite_players_explanation" />
         <Button android:id="@+id/button_see_invitations"
             style="@style/MainScreenButton"
-            android:onClick="onClick"
             android:text="@string/see_invitations" />
         <TextView style="@style/MainScreenButtonBlurb"
             android:text="@string/see_invitations_explanation" />
         <Button android:id="@+id/button_sign_out"
-            android:onClick="onClick"
             style="@style/SignOutButton"
             android:text="@string/sign_out" />
     </LinearLayout>
@@ -66,7 +61,6 @@
             style="@style/InvPopupText" />
         <Button
             android:id="@+id/button_accept_popup_invitation"
-            android:onClick="onClick"
             style="@style/InvPopupButton"
             android:text="@string/accept_popup_invite" />
     </LinearLayout>
